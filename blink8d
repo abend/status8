@@ -9,55 +9,27 @@ import pyinotify
 import re
 
 class Handler(pyinotify.ProcessEvent):
-    def process_IN_CREATE(self, event):
-        if numberfile(event.pathname):
-            print "Creating:", event.pathname
-
-    def process_IN_MODIFY(self, event):
-        if numberfile(event.pathname):
-            print "Modifying:", event.pathname
 
     def process_IN_CLOSE_WRITE(self, event):
+        """Called after creation and update finish."""
         if numberfile(event.pathname):
             print "Close write:", event.pathname
-
         
     def process_IN_DELETE(self, event):
         if numberfile(event.pathname):
             print "Removing:", event.pathname
 
-    def process_default(self, event):
-        # Implicitely IN_CREATE and IN_DELETE are watched too. You can
-        # ignore them and provide an empty process_default or you can
-        # process them, either with process_default or their dedicated
-        # method (process_IN_CREATE, process_IN_DELETE) which would
-        # override process_default.
-        print 'default: ', event.maskname
-
 
 def numberfile(path):
     return re.match(r".*/[1-8]$", path)
 
-
-# excl_lst = ['\.swpx?$']
-# excl = pyinotify.ExcludeFilter(excl_lst)
-
-#handler = Empty(TrackModifications(Log(fileobj=fo)), msg='Outer chained method')
 handler = Handler()
 
 wm = pyinotify.WatchManager()
-#mask = pyinotify.IN_DELETE | pyinotify.IN_MODIFY | pyinotify.IN_CREATE
+mask = pyinotify.IN_CLOSE_WRITE | pyinotify.IN_DELETE
+wm.add_watch('/var/run/blink8/', mask, rec = True)
 
 notifier = pyinotify.Notifier(wm, handler, read_freq=1)
-wm.add_watch('/var/run/blink8/', 
-             #mask,
-             pyinotify.ALL_EVENTS, 
-             #proc_fun = ProcessTransientFile, 
-             #do_glob = True,
-             rec = True, 
-             #exclude_filter=excl
-         )
-
 notifier.coalesce_events()
 
 notifier.loop()
