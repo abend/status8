@@ -7,29 +7,65 @@
 
 import pyinotify
 import re
+import serial
+import sys
 
 class Handler(pyinotify.ProcessEvent):
 
+    def __init__(self):
+        self.count = 0
+
+    def watch(self, watch_dir):
+        #handler = Handler()
+
+        wm = pyinotify.WatchManager()
+        mask = pyinotify.IN_CLOSE_WRITE | pyinotify.IN_DELETE
+        wm.add_watch(watch_dir, mask, rec = True)
+
+        notifier = pyinotify.Notifier(wm, handler, read_freq=1)
+        notifier.coalesce_events()
+
+        notifier.loop()
+
+    def open_serial(self, port):
+        self.ser = serial.Serial(port, 9600, timeout=10)
+        # x = ser.read()          # read one byte
+        # s = ser.read(10)        # read up to ten bytes (timeout)
+        # line = ser.readline()   # read a '\n' terminated line
+        # ser.close()
+
     def process_IN_CLOSE_WRITE(self, event):
         """Called after creation and update finish."""
-        if numberfile(event.pathname):
-            print "Close write:", event.pathname
+        num = self.numberfile(event.pathname)
+        if num:
+            self.command(num.group(1), "on")
         
     def process_IN_DELETE(self, event):
-        if numberfile(event.pathname):
-            print "Removing:", event.pathname
+        num = self.numberfile(event.pathname)
+        if num:
+            self.command(num.group(1), "off")
+
+    def numberfile(self, path):
+        return re.match(r".*/([1-8])$", path)
+
+    def command(self, num, cmd):
+        self.ser.write("{} {}".format(num, cmd))
 
 
-def numberfile(path):
-    return re.match(r".*/[1-8]$", path)
 
-handler = Handler()
+if __name__ == '__main__':
+    if len(sys.argv) < 1:
+        print >> sys.stderr, "Command line error: missing argument(s)."
+        sys.exit(1)
 
-wm = pyinotify.WatchManager()
-mask = pyinotify.IN_CLOSE_WRITE | pyinotify.IN_DELETE
-wm.add_watch('/var/run/blink8/', mask, rec = True)
+    serial_port = sys.argv[1]
 
-notifier = pyinotify.Notifier(wm, handler, read_freq=1)
-notifier.coalesce_events()
+    if len(sys.argv) > 2:
+        watch_dir = sys.argv[2]
+    else:
+        watch_dir = '/var/run/blink8/'
 
-notifier.loop()
+    print "watching {} sending via {}".format(watch_dir, serial_port)
+    handler = Handler()
+    handler.open_serial(serial_port)
+    handler.watch(watch_dir)
