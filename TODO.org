@@ -1,5 +1,6 @@
 * daemon
 ** support reconnect to arduino
+** turn on leds at startup
 
 * arduino
 

@@ -9,15 +9,18 @@ import pyinotify
 import re
 import serial
 import sys
+import os
+import time
+from os import listdir
+from os.path import isfile, join
+
 
 class Handler(pyinotify.ProcessEvent):
 
-    def __init__(self):
-        self.count = 0
+    def __init__(self, watch_dir):
+        self.watch_dir = watch_dir
 
-    def watch(self, watch_dir):
-        #handler = Handler()
-
+    def watch(self):
         wm = pyinotify.WatchManager()
         mask = pyinotify.IN_CLOSE_WRITE | pyinotify.IN_DELETE
         wm.add_watch(watch_dir, mask, rec = True)
@@ -31,8 +34,20 @@ class Handler(pyinotify.ProcessEvent):
         self.ser = serial.Serial(port, 9600, timeout=10)
         # x = ser.read()          # read one byte
         # s = ser.read(10)        # read up to ten bytes (timeout)
-        # line = ser.readline()   # read a '\n' terminated line
+        line = self.ser.readline()   # read a '\n' terminated line
+        print line
         # ser.close()
+        time.sleep(3)
+
+    def init_state(self):
+        """Process the current state of the watched directory."""
+        files = [ f for f in listdir(self.watch_dir) if isfile(join(self.watch_dir,f)) and self.numberfile(join(self.watch_dir,f)) ]
+        for f in files:
+            num = self.numberfile(join(self.watch_dir,f))
+            if num:
+                print "existing file: " + f
+                self.command(num.group(1), "on")
+        
 
     def process_IN_CLOSE_WRITE(self, event):
         """Called after creation and update finish."""
@@ -49,7 +64,10 @@ class Handler(pyinotify.ProcessEvent):
         return re.match(r".*/([1-8])$", path)
 
     def command(self, num, cmd):
-        self.ser.write("{} {}".format(num, cmd))
+        allcmd = "{} {}".format(num, cmd)
+        print allcmd
+        self.ser.write(allcmd)
+        time.sleep(1)
 
 
 
@@ -65,7 +83,13 @@ if __name__ == '__main__':
     else:
         watch_dir = '/var/run/blink8/'
 
+    if not os.path.isdir(watch_dir):
+        print >> sys.stderr, "Watch directory not found: " + watch_dir
+        sys.exit(1)
+
     print "watching {} sending via {}".format(watch_dir, serial_port)
-    handler = Handler()
+
+    handler = Handler(watch_dir)
     handler.open_serial(serial_port)
-    handler.watch(watch_dir)
+    handler.init_state()
+    handler.watch()
