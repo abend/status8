@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-# for proper daemonization, see 
+# for proper daemonization, see
 # https://github.com/seb-m/pyinotify/blob/master/python2/examples/daemon.py
 
 # built from https://github.com/seb-m/pyinotify/wiki/List-of-Examples
@@ -17,27 +17,26 @@ from os.path import isfile, join
 
 class Handler(pyinotify.ProcessEvent):
 
-    def __init__(self, watch_dir):
+    def __init__(self, watch_dir, port):
         self.watch_dir = watch_dir
+        self.port = port
 
     def watch(self):
         wm = pyinotify.WatchManager()
         mask = pyinotify.IN_CLOSE_WRITE | pyinotify.IN_DELETE
         wm.add_watch(watch_dir, mask, rec = True)
-
         notifier = pyinotify.Notifier(wm, handler, read_freq=1)
         notifier.coalesce_events()
-
         notifier.loop()
 
-    def open_serial(self, port):
-        self.ser = serial.Serial(port, 9600, timeout=10)
-        # x = ser.read()          # read one byte
-        # s = ser.read(10)        # read up to ten bytes (timeout)
-        line = self.ser.readline()   # read a '\n' terminated line
+    def open_serial(self):
+        try:
+            self.ser = serial.Serial(self.port, 9600, timeout=10)
+        except serial.serialutil.SerialException, e:
+            print "Error connecting: " + str(e)
+            sys.exit(1)
+        line = self.ser.readline()
         print line
-        # ser.close()
-        time.sleep(3)
 
     def init_state(self):
         """Process the current state of the watched directory."""
@@ -47,14 +46,13 @@ class Handler(pyinotify.ProcessEvent):
             if num:
                 print "existing file: " + f
                 self.command(num.group(1), "on")
-        
 
     def process_IN_CLOSE_WRITE(self, event):
         """Called after creation and update finish."""
         num = self.numberfile(event.pathname)
         if num:
             self.command(num.group(1), "on")
-        
+
     def process_IN_DELETE(self, event):
         num = self.numberfile(event.pathname)
         if num:
@@ -66,8 +64,12 @@ class Handler(pyinotify.ProcessEvent):
     def command(self, num, cmd):
         allcmd = "{} {}".format(num, cmd)
         print allcmd
-        self.ser.write(allcmd)
-        time.sleep(1)
+        try:
+            self.ser.write(allcmd)
+            print self.ser.readline()
+        except serial.serialutil.SerialException, e:
+            print "Error sending command ({}): attempting serial reconnect".format(e)
+            self.open_serial()
 
 
 
@@ -89,7 +91,7 @@ if __name__ == '__main__':
 
     print "watching {} sending via {}".format(watch_dir, serial_port)
 
-    handler = Handler(watch_dir)
-    handler.open_serial(serial_port)
+    handler = Handler(watch_dir, serial_port)
+    handler.open_serial()
     handler.init_state()
     handler.watch()
