@@ -51,8 +51,7 @@ void loop()
 		str.trim();
 		Serial.println(str + ": " + String(x));
 		if (checkLED(x)) {
-			strip.setPixelColor(x - 1, str == "on" ? colors[x] : black);
-			strip.show();
+			changeToColor(x, str == "on" ? colors[x] : black);
 		}
     }
 }
@@ -60,6 +59,45 @@ void loop()
 // valid number for the LED?
 boolean checkLED(int i) {
 	return i > 0 && i <= LED_COUNT;
+}
+
+void changeToColor(int led, uint32_t newColor) {
+	uint32_t curColor = strip.getPixelColor(led - 1);
+
+	int steps = 256;
+
+	uint8_t
+		cr = (uint8_t)(curColor >> 16),
+		cg = (uint8_t)(curColor >>  8),
+		cb = (uint8_t) curColor;
+
+	uint8_t
+		nr = (uint8_t)(newColor >> 16),
+		ng = (uint8_t)(newColor >>  8),
+		nb = (uint8_t) newColor;
+
+	float
+		dr = nr - cr,
+		dg = ng - cg,
+		db = nb - cb;
+
+	float
+		sr = dr / steps,
+		sg = dg / steps,
+		sb = db / steps;
+
+	uint8_t ir, ig, ib;
+
+	for (int i = 0; i < steps; ++i) {
+		ir = cr + (int)(sr * i);
+		ig = cg + (int)(sg * i);
+		ib = cb + (int)(sb * i);
+		strip.setPixelColor(led - 1, strip.Color(ir, ig, ib));
+		strip.show();
+		delay(7);
+	}
+	strip.setPixelColor(led - 1, newColor);
+	strip.show();
 }
 
 // Input a value 0 to 255 to get a color value.
