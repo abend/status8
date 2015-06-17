@@ -1,7 +1,8 @@
 * daemon
 ** support reconnect to arduino
-** turn on leds at startup
+** support color specified in run file
 
 * arduino
+** take color definition over the wire
 
 * enclosure
