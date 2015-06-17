@@ -83,7 +83,7 @@ if __name__ == '__main__':
     if len(sys.argv) > 2:
         watch_dir = sys.argv[2]
     else:
-        watch_dir = '/var/run/blink8/'
+        watch_dir = '/var/run/status8/'
 
     if not os.path.isdir(watch_dir):
         print >> sys.stderr, "Watch directory not found: " + watch_dir
